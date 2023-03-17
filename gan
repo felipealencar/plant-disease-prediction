@@ -1,0 +1,10 @@
+digraph {
+	G [label=Generator]
+	D [label=Discriminator]
+	X [label=Input]
+	Y [label=Output]
+	X -> G
+	G -> Y
+	Y -> D
+	D -> X
+}
