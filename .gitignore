@@ -6,7 +6,10 @@ __pycache__/
 *.tif.aux.xml
 # C extensions
 *.so
-
+dataset/*.tif
+dataset/*.tif.aux.xml
+dataset/*.*
+dataset/*
 # Distribution / packaging
 .Python
 build/
