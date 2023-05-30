@@ -8,8 +8,6 @@ __pycache__/
 *.so
 dataset/*.tif
 dataset/*.tif.aux.xml
-dataset/*.*
-dataset/*
 # Distribution / packaging
 .Python
 build/
