@@ -40,6 +40,9 @@ myenv
 pip-log.txt
 pip-delete-this-directory.txt
 
+output - Copy (2).csv
+output.csv
+
 # Unit test / coverage reports
 htmlcov/
 .tox/
