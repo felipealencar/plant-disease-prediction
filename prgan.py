@@ -107,7 +107,7 @@ def wasserstein_loss(y_true, y_pred):
 	return backend.mean(y_true * y_pred)
 
 # add a discriminator block
-def add_discriminator_block(old_model, n_input_layers=3):
+def add_discriminator_block(old_model, optimizer, n_input_layers=3):
     # weight initialization
     init = RandomNormal(stddev=0.02)
     # weight constraint
@@ -133,7 +133,7 @@ def add_discriminator_block(old_model, n_input_layers=3):
     # define straight-through model
     model1 = Model(in_image, d)
     # compile model
-    model1.compile(loss=wasserstein_loss, optimizer=Adam(lr=0.0002, beta_1=0, beta_2=0.99, epsilon=10e-8))
+    model1.compile(loss=wasserstein_loss, optimizer=optimizer)
     # downsample the new larger image
     downsample = AveragePooling2D()(in_image)
     # connect old input processing to downsampled new input
@@ -147,11 +147,11 @@ def add_discriminator_block(old_model, n_input_layers=3):
     # define straight-through model
     model2 = Model(in_image, d)
     # compile model
-    model2.compile(loss=wasserstein_loss, optimizer=Adam(lr=0.002, beta_1=0, beta_2=0.99, epsilon=10e-8))
+    model2.compile(loss=wasserstein_loss, optimizer=optimizer)
     return [model1, model2]
 
 # define the discriminator models for each image resolution
-def define_discriminator(n_blocks, input_shape=(4,4,2)):
+def define_discriminator(n_blocks, optimizer, input_shape=(4,4,2)):
 	# weight initialization
 	init = RandomNormal(stddev=0.02)
 	# weight constraint
@@ -183,7 +183,7 @@ def define_discriminator(n_blocks, input_shape=(4,4,2)):
 		# get prior model without the fade-on
 		old_model = model_list[i - 1][0]
 		# create new model for next resolution
-		models = add_discriminator_block(old_model)
+		models = add_discriminator_block(old_model, optimizer)
 		# store model
 		model_list.append(models)
 	return model_list
@@ -255,7 +255,7 @@ def define_generator(latent_dim, n_blocks, in_dim=4):
 	return model_list
 
 # define composite models for training generators via discriminators
-def define_composite(discriminators, generators):
+def define_composite(discriminators, generators, optimizer):
 	model_list = list()
 	# create composite models
 	for i in range(len(discriminators)):
@@ -265,13 +265,13 @@ def define_composite(discriminators, generators):
 		model1 = Sequential()
 		model1.add(g_models[0])
 		model1.add(d_models[0])
-		model1.compile(loss=wasserstein_loss, optimizer=Adam(lr=0.0002, beta_1=0, beta_2=0.99, epsilon=10e-8))
+		model1.compile(loss=wasserstein_loss, optimizer=optimizer)
 		# fade-in model
 		d_models[1].trainable = False
 		model2 = Sequential()
 		model2.add(g_models[1])
 		model2.add(d_models[1])
-		model2.compile(loss=wasserstein_loss, optimizer=Adam(lr=0.0002, beta_1=0, beta_2=0.99, epsilon=10e-8))
+		model2.compile(loss=wasserstein_loss, optimizer=optimizer)
 		# store
 		model_list.append([model1, model2])
 	return model_list
@@ -435,23 +435,24 @@ def train(g_models, d_models, gan_models, dataset, latent_dim, e_norm, e_fadein,
 		summarize_performance('tuned', g_normal, latent_dim)
 	return generator, generator_loss_values
 
-def build(X_train_array):
+
+def build(X, noise_dim, optimizer):
 	# number of growth phases, e.g. 6 == [4, 8, 16, 32, 64, 128]
-	n_blocks = 3
+	n_blocks = 5
 	# size of the latent space
-	latent_dim = 100
+	latent_dim = noise_dim
 	# define models
-	d_models = define_discriminator(n_blocks)
+	d_models = define_discriminator(n_blocks, optimizer)
 	# define models
 	g_models = define_generator(latent_dim, n_blocks)
 	# define composite models
-	gan_models = define_composite(d_models, g_models)
+	gan_models = define_composite(d_models, g_models, optimizer)
 	# load image data
-	dataset = load_real_samples(X_train_array)
+	dataset = load_real_samples(X)
 	# train model
-	n_batch = [32, 32, 32]
+	n_batch = [20, 20, 20, 20, 20]
 	# 10 epochs == 500K images per training phase
-	n_epochs = [30, 30, 20]
+	n_epochs = [10, 10, 10, 10, 10]
 
 	generator_loss_values = []
 	generator, generator_loss_values = train(g_models, d_models, gan_models, dataset, latent_dim, n_epochs, n_epochs, n_batch, generator_loss_values)

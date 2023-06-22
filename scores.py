@@ -9,19 +9,35 @@ import tensorflow as tf
 from scipy.linalg import sqrtm
 import cv2
 from sklearn.metrics import jaccard_score
+from PIL import Image
 
 
 def preprocess_array(array):
     # Normalize array to range [-1, 1]
     normalized_array = (array - 0.5) * 2.0
-    # Add third channel by replicating the second channel
-    extra_channel = np.zeros_like(array[..., :1])
-    expanded_array = np.concatenate([normalized_array, extra_channel], axis=-1)
+    if array.shape[3] < 3:
+        # Add third channel by replicating the second channel
+        extra_channel = np.zeros_like(array[..., :1])
+        expanded_array = np.concatenate([normalized_array, extra_channel], axis=-1)
+        return expanded_array
 
-    return expanded_array
+    return normalized_array
 
 
 def calculate_fid(real_images, generated_images):
+    if real_images.shape[3] > 3:
+        rgb_real_images = []
+        rgb_generated_images = []
+        for real_image, generated_image in zip(real_images, generated_images):
+            # Convert each image to RGB
+            rgb_real_image = Image.fromarray(real_image[:, :, :3].astype(np.uint8))
+            rgb_gererated_image = Image.fromarray(generated_image[:, :, :3].astype(np.uint8))
+            # Append the RGB image to the list
+            rgb_real_images.append(np.array(rgb_real_image))
+            rgb_generated_images.append(np.array(rgb_gererated_image))
+        real_images = np.array(rgb_real_images)
+        generated_images = np.array(rgb_generated_images)
+
     # Load pre-trained InceptionV3 model
     inception_model = tf.keras.applications.InceptionV3(include_top=False, pooling='avg')
 
@@ -54,24 +70,24 @@ def calculate_fid(real_images, generated_images):
     return fid, fid_error
 
 
-def scores(real_images, generated_images):
-    num_images = real_images.shape[0]
+def scores(real_images, generated_images, flatten_real_images, flatten_generated_images):
+    num_samples = len(real_images)
 
     # Calculate FID
     fid, fid_error = calculate_fid(real_images, generated_images)
     print('Bhattacharyya started...')
     # Calculate Bhattacharyya distance and error
-    bhattacharyya, bhattacharyya_error = calculate_bhattacharyya(real_images, generated_images)
+    bhattacharyya, bhattacharyya_error = calculate_bhattacharyya(real_images, generated_images, flatten_real_images, flatten_generated_images)
     print('Bhattacharyya done.')
 
     # Calculate Chi-Square distance and error
-    print('Chi-square started...')
-    chi_square, chi_square_error = calculate_chi_square(real_images, generated_images)
+    #print('Chi-square started...')
+    chi_square, chi_square_error = calculate_chi_square(real_images, generated_images, flatten_real_images, flatten_generated_images)
     print('Chi-square done.')
 
     print('Correlation started...')
     # Calculate Correlation coefficient
-    correlation, correlation_error = calculate_correlation(real_images, generated_images)
+    correlation, correlation_error = calculate_correlation(real_images, generated_images, flatten_real_images, flatten_generated_images)
     print('Correlation done.')
 
     # Calculate Intersection and error
@@ -81,15 +97,14 @@ def scores(real_images, generated_images):
     return fid, fid_error, bhattacharyya, bhattacharyya_error, chi_square, chi_square_error, correlation, correlation_error, intersection, intersection_error
 
 
-def calculate_bhattacharyya(real_images, generated_images, num_samples=1000):
-    hist_real, _ = np.histogram(real_images.flatten(), bins=256, range=(0, 1))
-    hist_generated, _ = np.histogram(generated_images.flatten(), bins=256, range=(0, 1))
-    total_samples = real_images.size + generated_images.size
+def calculate_bhattacharyya(real_images, generated_images, flatten_real_images, flatten_generated_images, num_samples=1000):
+    hist_real, _ = np.histogram(flatten_real_images, bins=256, range=(0, 1))
+    hist_generated, _ = np.histogram(flatten_generated_images, bins=256, range=(0, 1))
 
     bhattacharyya_values = []
     for _ in range(num_samples):
-        sampled_real = np.random.choice(real_images.flatten(), size=real_images.size, replace=True)
-        sampled_generated = np.random.choice(generated_images.flatten(), size=generated_images.size, replace=True)
+        sampled_real = np.random.choice(flatten_real_images, size=real_images.size, replace=True)
+        sampled_generated = np.random.choice(flatten_generated_images, size=generated_images.size, replace=True)
         sampled_hist_real, _ = np.histogram(sampled_real, bins=256, range=(0, 1))
         sampled_hist_generated, _ = np.histogram(sampled_generated, bins=256, range=(0, 1))
 
@@ -122,15 +137,15 @@ def calculate_bootstrap_metric(real_images, generated_images, metric_function, n
     return metric_mean, metric_error_margin
 
 
-def calculate_chi_square(real_images, generated_images, num_samples=1000):
-    observed_real, _ = np.histogram(real_images.flatten(), bins=256, range=(0, 1))
-    observed_generated, _ = np.histogram(generated_images.flatten(), bins=256, range=(0, 1))
+def calculate_chi_square(real_images, generated_images, flatten_real_images, flatten_generated_images, num_samples=1000):
+    observed_real, _ = np.histogram(flatten_real_images, bins=256, range=(0, 1))
+    observed_generated, _ = np.histogram(flatten_generated_images, bins=256, range=(0, 1))
     expected = (observed_real + observed_generated) / 2.0
 
     chi_square_values = []
     for _ in range(num_samples):
-        sampled_real = np.random.choice(real_images.flatten(), size=real_images.size, replace=True)
-        sampled_generated = np.random.choice(generated_images.flatten(), size=generated_images.size, replace=True)
+        sampled_real = np.random.choice(flatten_real_images, size=real_images.size, replace=True)
+        sampled_generated = np.random.choice(flatten_generated_images, size=generated_images.size, replace=True)
         sampled_observed_real, _ = np.histogram(sampled_real, bins=256, range=(0, 1))
         sampled_observed_generated, _ = np.histogram(sampled_generated, bins=256, range=(0, 1))
         sampled_expected = (sampled_observed_real + sampled_observed_generated) / 2.0
@@ -143,11 +158,11 @@ def calculate_chi_square(real_images, generated_images, num_samples=1000):
     return chi_square, margin_error
 
 
-def calculate_correlation(real_images, generated_images, num_samples=1000):
+def calculate_correlation(real_images, generated_images, flatten_real_images, flatten_generated_images, num_samples=1000):
     correlation_values = []
     for _ in range(num_samples):
-        sampled_real = np.random.choice(real_images.flatten(), size=real_images.size, replace=True)
-        sampled_generated = np.random.choice(generated_images.flatten(), size=generated_images.size, replace=True)
+        sampled_real = np.random.choice(flatten_real_images, size=real_images.size, replace=True)
+        sampled_generated = np.random.choice(flatten_generated_images, size=generated_images.size, replace=True)
         sampled_correlation = np.corrcoef(sampled_real, sampled_generated)[0, 1]
         correlation_values.append(sampled_correlation)
 

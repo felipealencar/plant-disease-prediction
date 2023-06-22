@@ -1,33 +1,39 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 import numpy as np
+try:
+    from tensorflow.keras.optimizers import Adam
+except:
+    from keras.optimizers import Adam
 
 # Generator Model
-def build_generator_wgan():
+def build_generator_wgan(noise_dim, channels):
+    print(noise_dim)
     model = tf.keras.Sequential()
-    model.add(layers.Dense(18 * 18 * 256, use_bias=False, input_shape=(75 * 75 * 2,)))
+    model.add(layers.Dense(32 * 32 * 256, use_bias=False, input_shape=(noise_dim,)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
 
-    model.add(layers.Reshape((18, 18, 256)))
+    model.add(layers.Reshape((32, 32, 256)))
 
-    model.add(layers.Conv2DTranspose(128, (5, 5), strides=(2, 2), padding='same', use_bias=False))
+    model.add(layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same', use_bias=False))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
 
-    model.add(layers.Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', use_bias=False))
+    model.add(layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same', use_bias=False))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
 
-    model.add(layers.Conv2DTranspose(2, (4, 4), strides=(1, 1), padding='valid', use_bias=False, activation='tanh'))
+    model.add(layers.Conv2DTranspose(channels, (4, 4), strides=(1, 1), padding='same', use_bias=False, activation='tanh'))
 
     return model
 
 
 # Critic Model
-def build_critic_wgan():
+def build_critic_wgan(width, height, channels):
+    print(width, height, channels)
     model = tf.keras.Sequential()
-    model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same', input_shape=[75, 75, 2]))
+    model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same', input_shape=(width, height, channels)))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.3))
 
@@ -67,22 +73,22 @@ def gradient_penalty(critic, real_images, fake_images):
 
 
 # Training loop
-def train_wgan(images, epochs=100, batch_size=64, critic_steps=5):
+def train_wgan(images, width, height, channels, noise_dim, optimizer, epochs=100, batch_size=64, critic_steps=5):
     # Normalize the input images to the range [-1, 1]
     images = (images - 0.5) * 2.0
 
-    generator = build_generator_wgan()
-    critic = build_critic_wgan()
+    generator = build_generator_wgan(noise_dim, channels)
+    critic = build_critic_wgan(width, height, channels)
 
     # Define the optimizers for the generator and critic
-    generator_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
-    critic_optimizer = tf.keras.optimizers.Adam(learning_rate=0.0002, beta_1=0.5)
+    generator_optimizer = Adam(0.0002, 0.5)
+    critic_optimizer = Adam(0.0002, 0.5)
 
     @tf.function
     def train_step(images):
         for i in range(critic_steps):
             # Generate random noise as input to the generator
-            noise = tf.random.normal([batch_size, 75*75*2])
+            noise = tf.random.normal([batch_size, noise_dim])
             print('critic range', i)
             with tf.GradientTape() as critic_tape:
                 # Generate fake images from the noise using the generator
@@ -102,7 +108,7 @@ def train_wgan(images, epochs=100, batch_size=64, critic_steps=5):
             critic_optimizer.apply_gradients(zip(critic_gradients, critic.trainable_variables))
 
         # Generate random noise as input to the generator
-        noise = tf.random.normal([batch_size, 75*75*2])
+        noise = tf.random.normal([batch_size, noise_dim])
 
         with tf.GradientTape() as generator_tape:
             # Generate fake images from the noise using the generator
@@ -136,6 +142,6 @@ def train_wgan(images, epochs=100, batch_size=64, critic_steps=5):
 
     return generator, generator_wgan_loss_values
 
-def train(EPOCHS, STEPS, BATCH_SIZE, NOISE_DIM, X_train_array):
-    trained_generator, generator_loss = train_wgan(X_train_array, EPOCHS, BATCH_SIZE, STEPS)
+def train(X_train, width, height, channels, noise_dim, optimizer, epochs, steps, batch_size):
+    trained_generator, generator_loss = train_wgan(X_train, width, height, channels, noise_dim, optimizer, epochs, steps, batch_size)
     return trained_generator, generator_loss

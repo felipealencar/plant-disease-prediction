@@ -2,94 +2,107 @@ from keras.models import Sequential, Model
 from keras.layers import Dense, Flatten, Conv2D, Reshape, Input, Conv2DTranspose
 from keras.layers import Activation, LeakyReLU, BatchNormalization, Dropout, Resizing
 import numpy as np 
-from tqdm import tqdm
+from tqdm.auto import tqdm
+from IPython.display import clear_output, display
 
-
-def build_generator(OPTIMIZER, NOISE_DIM):
+def build_generator(optimizer, noise_dim, channels):
     model = Sequential([
-        Dense(25 * 25 * 256, input_dim=NOISE_DIM),
+
+        Dense(32*32*256, input_dim=noise_dim),
         LeakyReLU(alpha=0.2),
-        Reshape((25, 25, 256)),
+        Reshape((32,32,256)),
         
-        Conv2DTranspose(32, (2, 2), strides=(3, 3), padding='valid'),
+        Conv2DTranspose(128, (4, 4), strides=2, padding='same'),
         LeakyReLU(alpha=0.2),
 
-        Conv2DTranspose(64, (2, 2), strides=(1, 1), padding='valid'),
-        LeakyReLU(alpha=0.2),
-        
-        Conv2DTranspose(128, (2, 2), strides=(1, 1), padding='valid'),
+        Conv2DTranspose(128, (4, 4), strides=2, padding='same'),
         LeakyReLU(alpha=0.2),
 
-        Conv2D(2, (3, 3), padding='valid', activation='tanh')
-    ], name="generator")
-
+        Conv2D(channels, (4, 4), padding='same', activation='tanh')
+    ], 
+    name="generator")
     model.summary()
-    model.compile(loss="binary_crossentropy", optimizer=OPTIMIZER)
+    model.compile(loss="binary_crossentropy", optimizer=optimizer)
 
     return model
 
 
-def build_discriminator(OPTIMIZER):
+def build_discriminator(optimizer, width, height, channels):
+    
+    """
+        Discriminator is the model which is responsible for classifying the generated images
+        as fake or real. Our end goal is to create a Generator so powerful that the Discriminator
+        is unable to classify real and fake images
+        A simple Convolutional Neural Network with 2 Conv2D layers connected to a Dense output layer
+        Output layer activation is Sigmoid since this is a Binary Classifier
+
+        Input: Generated / Real Image
+        Output: Validity of Image (Fake or Real)
+
+    """
+
     model = Sequential([
-        Conv2D(64, (3, 3), padding='same', input_shape=(75, 75, 2)),
+
+        Conv2D(64, (3, 3), padding='same', input_shape=(width, height, channels)),
         LeakyReLU(alpha=0.2),
 
-        Conv2D(75, (3, 3), strides=2, padding='same'),
+        Conv2D(128, (3, 3), strides=2, padding='same'),
         LeakyReLU(alpha=0.2),
 
-        Conv2D(75, (3, 3), strides=2, padding='same'),
+        Conv2D(128, (3, 3), strides=2, padding='same'),
         LeakyReLU(alpha=0.2),
-
-        Conv2D(75, (3, 3), strides=2, padding='same'),
+        
+        Conv2D(256, (3, 3), strides=2, padding='same'),
         LeakyReLU(alpha=0.2),
-
+        
         Flatten(),
         Dropout(0.4),
-        Dense(1, activation="sigmoid")
+        Dense(1, activation="sigmoid", input_shape=(width, height, channels))
     ], name="discriminator")
-    
     model.summary()
-    model.compile(loss="binary_crossentropy", optimizer=OPTIMIZER)
-    
+    model.compile(loss="binary_crossentropy", optimizer=optimizer)
+
     return model
 
 
-def build(OPTIMIZER, NOISE_DIM):
-    print('\n')
-    discriminator = build_discriminator(OPTIMIZER)
-    print('\n')
-    generator = build_generator(OPTIMIZER, NOISE_DIM)
+def build(optimizer, noise_dim, width, height, channels):
+    discriminator = build_discriminator(optimizer, width, height, channels)
+    generator = build_generator(optimizer, noise_dim, channels)
     trainable_discriminator_vars = discriminator.trainable_variables
     trainable_generator_vars = generator.trainable_variables
     trainable_vars = trainable_discriminator_vars + trainable_generator_vars
-    OPTIMIZER.build(trainable_vars)
+    optimizer.build(trainable_vars)
 
     discriminator.trainable = False 
 
-    gan_input = Input(shape=(NOISE_DIM,))
+    gan_input = Input(shape=(noise_dim,))
     fake_image = generator(gan_input)
     output = discriminator(fake_image)
 
     dcgan = Model(gan_input, output, name="gan_model")
-    dcgan.compile(loss="binary_crossentropy", optimizer=OPTIMIZER)
+    dcgan.compile(loss="binary_crossentropy", optimizer=optimizer)
     return generator, discriminator, dcgan
 
 
-def train(generator, disciminator, model, noise, EPOCHS, STEPS, BATCH_SIZE, NOISE_DIM, X_train_array):
+def train(X, generator, disciminator, model, noise, epochs, steps, batch_size, noise_dim):
     generator_dcgan_loss_values = []
-    for epoch in range(EPOCHS):
-        for _ in tqdm(range(STEPS)):
-            noise = np.random.normal(0,1, size=(BATCH_SIZE, NOISE_DIM))
+    for epoch in tqdm(range(epochs)):
+        for _ in tqdm(range(steps)):
+            noise = np.random.normal(0,1, size=(batch_size, noise_dim))
             fake_X = generator.predict(noise)
-            idx = np.random.randint(0, X_train_array.shape[0], size=BATCH_SIZE)
-            real_X = X_train_array[idx]
+            idx = np.random.randint(0, X.shape[0], size=batch_size)
+            real_X = X[idx]
             X = np.concatenate((real_X, fake_X))
-            disc_y = np.zeros(2*BATCH_SIZE)
-            disc_y[:BATCH_SIZE] = 1
+            disc_y = np.zeros(2*batch_size)
+            disc_y[:batch_size] = 1
             d_loss = disciminator.train_on_batch(X, disc_y)
-            y_gen = np.ones(BATCH_SIZE)
+            y_gen = np.ones(batch_size)
             g_loss = model.train_on_batch(noise, y_gen)
         generator_dcgan_loss_values.append(g_loss)
-        print(f"EPOCH: {epoch + 1} Generator Loss: {g_loss:.4f} Discriminator Loss: {d_loss:.4f}")
-        noise = np.random.normal(0, 1, size=(BATCH_SIZE, NOISE_DIM))
-    return generator_dcgan_loss_values
+        # Update the console output within the tqdm loop
+        description = f"EPOCH: {epoch + 1} Generator Loss: {g_loss:.4f} Discriminator Loss: {d_loss:.4f}"
+        clear_output(wait=True)
+        display(description)
+        noise = np.random.normal(0, 1, size=(batch_size, noise_dim))
+    return generator, generator_dcgan_loss_values
+
