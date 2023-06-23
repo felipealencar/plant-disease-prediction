@@ -1,3 +1,5 @@
+from tqdm.auto import tqdm
+from IPython.display import clear_output, display
 import tensorflow as tf
 from tensorflow.keras import layers
 import numpy as np
@@ -86,10 +88,9 @@ def train_wgan(images, width, height, channels, noise_dim, optimizer, epochs=100
 
     @tf.function
     def train_step(images):
-        for i in range(critic_steps):
+        for _ in tqdm(range(critic_steps)):
             # Generate random noise as input to the generator
             noise = tf.random.normal([batch_size, noise_dim])
-            print('critic range', i)
             with tf.GradientTape() as critic_tape:
                 # Generate fake images from the noise using the generator
                 generated_images = generator(noise)
@@ -131,14 +132,16 @@ def train_wgan(images, width, height, channels, noise_dim, optimizer, epochs=100
 
     # Training loop
     generator_wgan_loss_values = []
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs)):
         print(epoch)
         for image_batch in dataset:
             critic_loss_value, generator_loss_value = train_step(image_batch)
 
         generator_wgan_loss_values.append(generator_loss_value)
         # Print the losses for monitoring the training progress
-        print(f"Epoch {epoch+1}/{epochs}, Critic Loss: {critic_loss_value:.4f}, Generator Loss: {generator_loss_value:.4f}")
+        description = f"Epoch {epoch+1}/{epochs}, Generator Loss: {generator_loss_value:.4f}, Discriminator Loss: {critic_loss_value:.4f}"
+        clear_output(wait=True)
+        display(description)
 
     return generator, generator_wgan_loss_values
 

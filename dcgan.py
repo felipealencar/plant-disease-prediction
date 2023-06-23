@@ -81,23 +81,31 @@ def build(optimizer, noise_dim, width, height, channels):
 
     dcgan = Model(gan_input, output, name="gan_model")
     dcgan.compile(loss="binary_crossentropy", optimizer=optimizer)
+    
     return generator, discriminator, dcgan
 
 
-def train(X, generator, disciminator, model, noise, epochs, steps, batch_size, noise_dim):
+def train(X_train, generator, disciminator, model, noise, epochs, steps, batch_size, noise_dim):
     generator_dcgan_loss_values = []
+    np.random.seed(40)
     for epoch in tqdm(range(epochs)):
         for _ in tqdm(range(steps)):
-            noise = np.random.normal(0,1, size=(batch_size, noise_dim))
+
+            noise = np.random.normal(0, 1, size=(batch_size, noise_dim))
             fake_X = generator.predict(noise)
-            idx = np.random.randint(0, X.shape[0], size=batch_size)
-            real_X = X[idx]
+            
+            idx = np.random.randint(0, X_train.shape[0], size=batch_size)
+            real_X = X_train[idx]
+            
             X = np.concatenate((real_X, fake_X))
             disc_y = np.zeros(2*batch_size)
+            
             disc_y[:batch_size] = 1
             d_loss = disciminator.train_on_batch(X, disc_y)
+            
             y_gen = np.ones(batch_size)
             g_loss = model.train_on_batch(noise, y_gen)
+            
         generator_dcgan_loss_values.append(g_loss)
         # Update the console output within the tqdm loop
         description = f"EPOCH: {epoch + 1} Generator Loss: {g_loss:.4f} Discriminator Loss: {d_loss:.4f}"
