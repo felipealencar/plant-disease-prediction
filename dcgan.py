@@ -72,7 +72,7 @@ def build(optimizer, noise_dim, width, height, channels):
     trainable_generator_vars = generator.trainable_variables
     trainable_vars = trainable_discriminator_vars + trainable_generator_vars
     optimizer.build(trainable_vars)
-
+    #optimizer.apply_gradients(zip(trainable_vars, trainable_vars))
     discriminator.trainable = False 
 
     gan_input = Input(shape=(noise_dim,))
