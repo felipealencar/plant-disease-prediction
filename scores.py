@@ -13,8 +13,9 @@ from PIL import Image
 
 
 def preprocess_array(array):
-    # Normalize array to range [-1, 1]
-    normalized_array = (array - 0.5) * 2.0
+    # Normalize array to range [0, 1]
+    normalized_array = (array - np.min(array)) / (np.max(array) - np.min(array))
+
     if array.shape[3] < 3:
         # Add third channel by replicating the second channel
         extra_channel = np.zeros_like(array[..., :1])

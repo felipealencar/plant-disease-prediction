@@ -119,32 +119,31 @@ def train_step(real_data, generator, discriminator1, discriminator2, optimizer_G
     # y_gen = np.ones(batch_size)
     # g_loss = model.train_on_batch(noise, y_gen)
     # batch_size = tf.shape(real_data)[0]
-    spectral_weight = 0.1
+    spectral_weight = 1.0
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc1_tape, tf.GradientTape() as disc2_tape:
         # Generate fake data
         fake_data = generator(noise, training=True)
         red_edge = fake_data[:, :, :, 3]
-        print(red_edge)
         nir = fake_data[:, :, :, 4]
         G = tf.cast(G, tf.float32)
         H = tf.cast(H, tf.float32)
         K = tf.cast(K, tf.float32)
         modified_red_edge = G * tf.exp(-H * red_edge) + K * nir
-        print(modified_red_edge)
         # Update the last channel of `fake_data` with the modified Red Edge band
         # Replace the values of the last channel of `fake_data` with the values of `modified_red_edge`
-        # Update the last channel of `fake_data` with the modified Red Edge band
         last_channel_index = tf.shape(fake_data)[-1] - 1
-        fake_data = tf.concat([fake_data[:, :, :, :last_channel_index], modified_red_edge[..., tf.newaxis]], axis=-1)
+        fake_data2 = tf.concat([fake_data[:, :, :, :last_channel_index], modified_red_edge[..., tf.newaxis]], axis=-1)
+        min_value = tf.reduce_min(fake_data2)
+        fake_data2 = fake_data2 / min_value
 
-                # Compute discriminator losses
+        # Compute discriminator losses
         real_output1 = discriminator1(real_data, training=True)
         fake_output1 = discriminator1(fake_data, training=True)
-        disc1_loss = adversarial_loss(tf.ones_like(real_output1), real_output1) + adversarial_loss(tf.zeros_like(fake_output1), fake_output1)
+        disc1_loss = adversarial_loss(tf.ones_like(real_output1), real_output1) * adversarial_loss(tf.zeros_like(fake_output1), fake_output1)
 
         real_output2 = discriminator2(real_data, training=True)
-        fake_output2 = discriminator2(fake_data, training=True)
-        disc2_loss = adversarial_loss(tf.ones_like(real_output2), real_output2) + adversarial_loss(tf.zeros_like(fake_output2), fake_output2)
+        fake_output2 = discriminator2(fake_data2, training=True)
+        disc2_loss = adversarial_loss(tf.ones_like(real_output2), real_output2) * adversarial_loss(tf.zeros_like(fake_output2), fake_output2)
 
          # Calculate spectral regularization loss
         real_data = tf.cast(real_data, dtype=tf.float32)
@@ -154,7 +153,7 @@ def train_step(real_data, generator, discriminator1, discriminator2, optimizer_G
         sr_loss = spectral_regularization(real_spectrum, fake_spectrum)
 
         # Total generator loss
-        gen_loss = adversarial_loss(tf.ones_like(fake_output1), fake_output1) + adversarial_loss(tf.ones_like(fake_output2), fake_output2) + tf.cast(spectral_weight, tf.float32) * tf.cast(sr_loss, tf.float32)
+        gen_loss = adversarial_loss(tf.ones_like(fake_output1), fake_output1) + (adversarial_loss(tf.ones_like(fake_output2), fake_output2)) + (tf.cast(spectral_weight, tf.float32) * tf.cast(sr_loss, tf.float32)) * 100
 
     # Compute gradients
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.trainable_variables)
