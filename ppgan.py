@@ -27,16 +27,14 @@ def build_generator(optimizer, noise_dim, channels):
         name="generator",
     )
     # model.summary()
-    # model.compile(
-    #     loss="binary_crossentropy",
-    #     optimizer=tf.keras.optimizers.legacy.Adam(0.0002, 0.5),
-    # )
+    model.compile(loss="binary_crossentropy", optimizer=optimizer)
 
     return model
 
 
-def build_discriminator(optimizer, width, height, channels, name="discriminator", 
-                        loss="binary_crossentropy"):
+def build_discriminator(
+    optimizer, width, height, channels, name="discriminator", loss="binary_crossentropy"
+):
     """
     Discriminator is the model which is responsible for classifying the generated images
     as fake or real. Our end goal is to create a Generator so powerful that the Discriminator
@@ -66,7 +64,7 @@ def build_discriminator(optimizer, width, height, channels, name="discriminator"
         name=name,
     )
     # model.summary()
-    model.compile(loss=loss, optimizer=tf.keras.optimizers.legacy.Adam(0.0002, 0.5))
+    model.compile(loss=loss, optimizer=optimizer)
 
     return model
 
@@ -140,7 +138,7 @@ def train_step(
     # y_gen = np.ones(batch_size)
     # g_loss = model.train_on_batch(noise, y_gen)
     # batch_size = tf.shape(real_data)[0]
-    spectral_weight = 2.0
+    spectral_weight = 5.0
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc1_tape, tf.GradientTape() as disc2_tape:
         # Generate fake data
         fake_data = generator(noise, training=True)
@@ -160,8 +158,8 @@ def train_step(
             ],
             -1,
         )
-        # max_value = tf.reduce_max(fake_data2)
-        # fake_data2 = fake_data2 / max_value
+        min_value = tf.reduce_min(fake_data2)
+        fake_data2 = fake_data2 / min_value
 
         # Compute discriminator losses
         real_output1 = discriminator1(real_data, training=True)
@@ -172,24 +170,35 @@ def train_step(
 
         # Calculate spectral regularization loss
         real_data = tf.cast(real_data, dtype=tf.float32)
+        fake_data2 = tf.cast(fake_data2, dtype=tf.float32)
+        real_spectrum = tf.signal.fftshift(tf.signal.fft2d(tf.complex(real_data, 0.0)))
+        fake_spectrum = tf.signal.fftshift(tf.signal.fft2d(tf.complex(fake_data2, 0.0)))
+        sr_loss = spectral_regularization(real_spectrum, fake_spectrum)
+        
+        # Adicionei o spectrum como parâmetro do discriminator 2
+        real_output2 = discriminator2(real_spectrum, training=True)
+        fake_output2 = discriminator2(fake_spectrum, training=True)
+        disc2_loss = (
+            adversarial_loss(tf.ones_like(real_output2), real_output2)
+            * adversarial_loss(tf.zeros_like(fake_output2), fake_output2)
+        )
+
+        # Removi a constante 10
+        # Calculate spectral regularization loss
+        real_data = tf.cast(real_data, dtype=tf.float32)
         fake_data = tf.cast(fake_data, dtype=tf.float32)
         real_spectrum = tf.signal.fftshift(tf.signal.fft2d(tf.complex(real_data, 0.0)))
         fake_spectrum = tf.signal.fftshift(tf.signal.fft2d(tf.complex(fake_data, 0.0)))
         sr_loss = spectral_regularization(real_spectrum, fake_spectrum)
-        print(sr_loss)
 
-        real_output2 = discriminator2(real_spectrum, training=True)
-        fake_output2 = discriminator2(fake_spectrum, training=True)
-        disc2_loss = adversarial_loss(
-            tf.ones_like(real_output2), real_output2
-        ) * adversarial_loss(tf.zeros_like(fake_output2), fake_output2)
-
-        # disc2_loss = disc2_loss + (tf.cast(sr_loss, tf.float32) * tf.cast(spectral_weight, tf.float32))
+        # Adicionei uma nova adversarial loss e removi o spectral_weight
         # Total generator loss
         gen_loss = (
             adversarial_loss(tf.ones_like(fake_output1), fake_output1)
             + (adversarial_loss(tf.ones_like(fake_output2), fake_output2))
-            + (tf.cast(spectral_weight, tf.float32) * tf.cast(sr_loss, tf.float32))
+            + (adversarial_loss(tf.zeros_like(real_output1), real_output1))
+            + (adversarial_loss(tf.zeros_like(real_output2), real_output2))
+            + tf.cast(sr_loss, tf.float32) * tf.cast(spectral_weight, tf.float32)
         )
 
     # Compute gradients
@@ -227,18 +236,12 @@ def train(
     noise_dim,
 ):
     # Define the loss functions
-    adversarial_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    adversarial_loss = tf.keras.losses.BinaryCrossentropy(from_logits=False)
     spectral_regularization = tf.keras.losses.MeanSquaredError()
     # Define the optimizer for the generator and discriminator
-    optimizer_G = tf.keras.optimizers.legacy.Adam(
-        learning_rate=0.0002, beta_1=0.5, beta_2=0.999
-    )
-    optimizer_D1 = tf.keras.optimizers.legacy.Adam(
-        learning_rate=0.0002, beta_1=0.5, beta_2=0.999
-    )
-    optimizer_D2 = tf.keras.optimizers.legacy.Adam(
-        learning_rate=0.0002, beta_1=0.5, beta_2=0.999
-    )
+    optimizer_G = tf.keras.optimizers.Adam(0.0002, 0.5)
+    optimizer_D1 = tf.keras.optimizers.Adam(0.0002, 0.5)
+    optimizer_D2 = tf.keras.optimizers.Adam(0.0002, 0.5)
 
     generator_loss_values = []
     np.random.seed(40)
