@@ -1,3 +1,4 @@
+import tensorflow as tf
 from keras.models import Sequential, Model
 from keras.layers import Dense, Flatten, Conv2D, Reshape, Input, Conv2DTranspose
 from keras.layers import Activation, LeakyReLU, BatchNormalization, Dropout, Resizing
@@ -22,7 +23,9 @@ def build_generator(optimizer, noise_dim, channels):
     ], 
     name="generator")
     model.summary()
-    model.compile(loss="binary_crossentropy", optimizer=optimizer)
+    model.compile(loss="binary_crossentropy", optimizer=tf.keras.optimizers.Adam(
+        learning_rate=0.0002, beta_1=0.5, beta_2=0.999
+    ))
 
     return model
 
@@ -60,7 +63,9 @@ def build_discriminator(optimizer, width, height, channels):
         Dense(1, activation="sigmoid", input_shape=(width, height, channels))
     ], name="discriminator")
     model.summary()
-    model.compile(loss="binary_crossentropy", optimizer=optimizer)
+    model.compile(loss="binary_crossentropy", optimizer=tf.keras.optimizers.Adam(
+        learning_rate=0.0002, beta_1=0.5, beta_2=0.999
+    ))
 
     return model
 
@@ -71,8 +76,9 @@ def build(optimizer, noise_dim, width, height, channels):
     trainable_discriminator_vars = discriminator.trainable_variables
     trainable_generator_vars = generator.trainable_variables
     trainable_vars = trainable_discriminator_vars + trainable_generator_vars
+    print('wtf??????????', optimizer)
     optimizer.build(trainable_vars)
-    #optimizer.apply_gradients(zip(trainable_vars, trainable_vars))
+
     discriminator.trainable = False 
 
     gan_input = Input(shape=(noise_dim,))
@@ -80,7 +86,9 @@ def build(optimizer, noise_dim, width, height, channels):
     output = discriminator(fake_image)
 
     dcgan = Model(gan_input, output, name="gan_model")
-    dcgan.compile(loss="binary_crossentropy", optimizer=optimizer)
+    dcgan.compile(loss="binary_crossentropy", optimizer=tf.keras.optimizers.Adam(
+        learning_rate=0.0002, beta_1=0.5, beta_2=0.999
+    ))
     
     return generator, discriminator, dcgan
 
