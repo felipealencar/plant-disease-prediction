@@ -270,7 +270,6 @@ def train(
         description = f"EPOCH: {epoch + 1} Generator Loss: {gen_loss:.4f} Discriminator 1 Loss: {disc1_loss:.4f} Discriminator 2 Loss: {disc2_loss:.4f}"
         clear_output(wait=True)
         display(description)
-        noise = np.random.normal(0, 1, size=(batch_size, noise_dim))
     return generator, generator_loss_values
 
 
