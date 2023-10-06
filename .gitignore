@@ -239,3 +239,4 @@ trained_wgan_1026_QUAC.h5
 dataset/LARGO1/LARGO1-11-17-2021.csv
 dataset/.DS_Store
 dataset/LARGO1/LARGO1-11-17-2021.csv
+*.pt
