@@ -8,6 +8,14 @@ import matplotlib.pyplot as plt
 import tifffile
 from osgeo import gdal, ogr
 
+import networkx as nx
+import dgl
+from dgl.data import DGLDataset
+from dgl import DGLGraph
+import torch
+
+from skimage.segmentation import slic
+
 
 def split_plots(tiff_file, shp_file, output_folder, prefix, label, field="OBJECTID"):
     # Open the TIFF image file
@@ -108,3 +116,61 @@ def sample_images(
     plt.tight_layout()
     plt.show()
     return samples
+
+
+def graph_segmentation(image, num_days, num_segments):
+    print(image.dtype)
+    print(image.shape)
+    # Perform superpixel segmentation using SLIC
+    segments = slic(image, n_segments=num_segments)
+
+    # Create a DGL graph
+    g = dgl.DGLGraph()
+
+    # Add nodes to the graph
+    num_nodes = np.max(segments)
+    g.add_nodes(num_nodes)
+
+    # Initialize a dictionary to store "num_days" for each superpixel
+    num_days_dict = {}
+
+    # Iterate through the superpixels and connect neighboring superpixels
+    src, dst = [], []
+    for i in range(image.shape[0]):
+        for j in range(image.shape[1]):
+            node_id = segments[i, j]
+            if j < image.shape[1] - 1:
+                neighbor_id = segments[i, j + 1]
+                if node_id != neighbor_id and node_id < num_nodes and neighbor_id < num_nodes:
+                    src.append(node_id)
+                    dst.append(neighbor_id)
+            if i < image.shape[0] - 1:
+                neighbor_id = segments[i + 1, j]
+                if node_id != neighbor_id and node_id < num_nodes and neighbor_id < num_nodes:
+                    src.append(node_id)
+                    dst.append(neighbor_id)
+
+
+            # Store "num_days" information for each superpixel
+            if node_id not in num_days_dict:
+                num_days_dict[node_id] = []  # Initialize an empty list
+            num_days_dict[node_id].append(num_days)
+
+    g.add_edges(src, dst)
+
+    # You can add node features to the graph based on superpixel data
+    # For example, you can compute the average color or other statistics for each superpixel
+    superpixel_features = np.zeros((num_nodes, image.shape[2]), dtype=np.float32)
+    
+    for node_id in range(num_nodes):
+        # Compute superpixel features (e.g., average color)
+        superpixel_mask = (segments == node_id)
+        for channel in range(image.shape[2]):
+            superpixel_features[node_id, channel] = np.mean(image[..., channel][superpixel_mask])
+
+    g.ndata['feat'] = torch.tensor(superpixel_features)
+    # Add the "num_days" attribute to the nodes in the graph
+    num_days_attr = [np.mean(num_days_dict[node_id]) for node_id in range(1, num_nodes + 1)]
+    g.ndata['days'] = torch.tensor(num_days_attr, dtype=torch.float)
+
+    return g
