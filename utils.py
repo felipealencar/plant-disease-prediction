@@ -14,8 +14,40 @@ from dgl.data import DGLDataset
 from dgl import DGLGraph
 import torch
 
+import cv2
+
 from skimage.segmentation import slic
 
+def load_images(folder, label=""):
+    imgs = []
+    target = 1
+    labels = []
+    for i in os.listdir(folder):
+        if i.endswith(label):
+            img_dir = os.path.join(folder,i)
+            try:
+                img = tifffile.imread(img_dir)
+                if img.shape[1] > 128:
+                    img = img[:,:,:5]
+                    img = cv2.resize(img, (128,128))
+                    import sys
+                    import numpy
+                    numpy.set_printoptions(threshold=sys.maxsize)
+                    img = (img / 256).astype(np.uint8)
+                if 'synthetic' not in i:
+                    img = (img - img.min()) / (img.max() - img.min())
+                print(i)
+                if 'synthetic_image_19_1007-35-PREVIOUSDATE_PPGAN_HEALTHY' in i:
+                    print('synthetic', img)
+                imgs.append(img)
+                labels.append(target)
+            except:
+                continue
+                
+    imgs = np.array(imgs)
+    labels = np.array(labels)
+
+    return imgs, labels
 
 def split_plots(tiff_file, shp_file, output_folder, prefix, label, field="OBJECTID"):
     # Open the TIFF image file
@@ -101,6 +133,7 @@ def sample_images(
 
             # Save image with all 5 channels as TIFF
             image_data = np.transpose(image, (2, 0, 1))
+            print(image_data.shape)
             tifffile.imwrite(full_path + ".tiff", image_data, photometric="rgb")
         plt.subplots_adjust(wspace=None, hspace=None)
         plt.axis("off")
