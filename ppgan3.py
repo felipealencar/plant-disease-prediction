@@ -9,7 +9,7 @@ from scipy.optimize import minimize
 from tqdm.auto import tqdm
 from IPython.display import clear_output, display
 import sys
-sys.path.append('../multispectral_generative_models')
+sys.path.append('../temporal-multispectral-gen-models')
 
 import dgl
 import gnn as gnn
@@ -214,8 +214,8 @@ def train_step(
 
         tf.config.run_functions_eagerly(False) 
         
-        fake_graph = graph_segmentation(fake_array[0], 50, 100)
-        real_graph = graph_segmentation(imagery[0], 50, 100)
+        fake_graph = graph_segmentation(fake_array[0], 15, 100)
+        real_graph = graph_segmentation(imagery[0], 15, 100)
         
         fake_graph.ndata['feat'][torch.isnan(fake_graph.ndata['feat'])] = 0
         real_graph.ndata['feat'][torch.isnan(real_graph.ndata['feat'])] = 0
@@ -331,7 +331,7 @@ def train(
 
     gnn = BaseGNNModel(input_dim=6, hidden_dim=256, output_dim=5, num_layers=12)
     # Load the state dictionary of the saved model
-    gnn.load_state_dict(torch.load('/Users/felipealencar/Desktop/multispectral_generative_models/gnn/trained_backcasting_gnn_model.pth'))
+    gnn.load_state_dict(torch.load(r'C:\Users\flopes1\OneDrive - Saint Louis University\Desktop\Repos\temporal-multispectral-gen-models\gnn\trained_backcasting_gnn_model.pth'))
     # Set the model in evaluation mode
     gnn.eval()
     

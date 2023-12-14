@@ -34,11 +34,10 @@ def load_images(folder, label=""):
                     import numpy
                     numpy.set_printoptions(threshold=sys.maxsize)
                     img = (img / 256).astype(np.uint8)
+                if img.shape != (128, 128, 5):  # Check shape and transpose if necessary
+                    img = np.transpose(img, (1, 2, 0))
                 if 'synthetic' not in i:
                     img = (img - img.min()) / (img.max() - img.min())
-                print(i)
-                if 'synthetic_image_19_1007-35-PREVIOUSDATE_PPGAN_HEALTHY' in i:
-                    print('synthetic', img)
                 imgs.append(img)
                 labels.append(target)
             except:
