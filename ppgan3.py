@@ -214,8 +214,10 @@ def train_step(
 
         tf.config.run_functions_eagerly(False) 
         
-        fake_graph = graph_segmentation(fake_array[0], 15, 100)
-        real_graph = graph_segmentation(imagery[0], 15, 100)
+        # TODO: remember to parameterize the graph_segmentation function for num_days
+
+        fake_graph = graph_segmentation(fake_array[0], 50, 100)
+        real_graph = graph_segmentation(imagery[0], 50, 100)
         
         fake_graph.ndata['feat'][torch.isnan(fake_graph.ndata['feat'])] = 0
         real_graph.ndata['feat'][torch.isnan(real_graph.ndata['feat'])] = 0
