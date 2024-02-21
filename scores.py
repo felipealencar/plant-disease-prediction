@@ -30,25 +30,30 @@ def calculate_fid(real_images, generated_images):
         rgb_real_images = []
         rgb_generated_images = []
         for real_image, generated_image in zip(real_images, generated_images):
+            # ALREADY CHECKED THAT real_image and generated_image have different values
             # Convert each image to RGB
-            rgb_real_image = Image.fromarray(real_image[:, :, :3].astype(np.uint8))
-            rgb_gererated_image = Image.fromarray(generated_image[:, :, :3].astype(np.uint8))
-            # Append the RGB image to the list
-            rgb_real_images.append(np.array(rgb_real_image))
-            rgb_generated_images.append(np.array(rgb_gererated_image))
+            # Append the RGB image to the list - check if removing .astype(np.uint8)) solves the problem
+            rgb_real_images.append(real_image[:, :, :3])
+            rgb_generated_images.append(generated_image[:, :, :3])
         real_images = np.array(rgb_real_images)
         generated_images = np.array(rgb_generated_images)
 
     # Load pre-trained InceptionV3 model
     inception_model = tf.keras.applications.InceptionV3(include_top=False, pooling='avg')
 
+    if (real_images == generated_images).all():
+        print('OXE3')
+
     # Generate feature vectors for both arrays
     features1 = inception_model.predict(real_images)
     features2 = inception_model.predict(generated_images)
+    if features1.all() == features2.all():
+        print('OXE')
 
     # Compute mean and covariance matrices
     mean1 = np.mean(features1, axis=0)
     mean2 = np.mean(features2, axis=0)
+
     cov1 = np.cov(features1, rowvar=False)
     cov2 = np.cov(features2, rowvar=False)
 
