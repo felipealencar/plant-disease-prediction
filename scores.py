@@ -47,8 +47,6 @@ def calculate_fid(real_images, generated_images):
     # Generate feature vectors for both arrays
     features1 = inception_model.predict(real_images)
     features2 = inception_model.predict(generated_images)
-    if features1.all() == features2.all():
-        print('OXE')
 
     # Compute mean and covariance matrices
     mean1 = np.mean(features1, axis=0)
