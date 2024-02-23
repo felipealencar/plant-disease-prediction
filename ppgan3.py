@@ -9,6 +9,7 @@ from scipy.optimize import minimize
 from tqdm.auto import tqdm
 from IPython.display import clear_output, display
 import sys
+
 sys.path.append('../temporal-multispectral-gen-models')
 
 import dgl
