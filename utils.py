@@ -55,7 +55,14 @@ def split_plots(tiff_file, shp_file, output_folder, prefix, label, field="OBJECT
         raise Exception(f"Failed to open TIFF file: {tiff_file}")
 
     # Open the shapefile
-    shp_dataset = ogr.Open(shp_file)
+    try:
+        shp_dataset = ogr.Open(shp_file)
+        if shp_dataset is None:
+            print("Error: Unable to open shapefile.")
+        else:
+            print("Shapefile opened successfully.")
+    except Exception as e:
+        print("An error occurreeeed:", e)
     if shp_dataset is None:
         raise Exception(f"Failed to open shapefile: {shp_file}")
 
