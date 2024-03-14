@@ -290,3 +290,5 @@ output-images.csv
 dataset/LARGO2/08-30/CHACABUCO_LARGO_0830_ALL
 dataset/LARGO1/08-30/LARGO1_0830
 output-temporal-synthetic-images.csv
+image-based-cnn-model_synthetic.h5
+image-based-cnn-model.h5
