@@ -227,15 +227,15 @@ def train_step(
         fake_graph = dgl.add_self_loop(fake_graph)
         real_graph = dgl.add_self_loop(real_graph)
         
+        # The following function uses the trained GNN model to predict the graph output of the desired num_days
         output = discriminate_generated_graphs(gnn, fake_graph)
-
 
         scaler = MinMaxScaler()
         real_graph_normalized_features = scaler.fit_transform(real_graph.ndata['feat'])
         output_normalized_features = scaler.fit_transform(output)
         g_loss = gnn_loss(real_graph_normalized_features, output_normalized_features)
         print('g_loss', g_loss)
-        # Removi a constante 10
+
         # Calculate spectral regularization loss
         real_data = tf.cast(real_data, dtype=tf.float32)
         fake_data = tf.cast(fake_data, dtype=tf.float32)
@@ -267,7 +267,6 @@ def train_step(
         print('gen1_loss', gen1_loss)
         print('gen2_loss', gen2_loss)
 
-    print('teste')
     # Compute gradients
     gradients_of_generator1 = gen1_tape.gradient(gen1_loss, generator1.trainable_variables)
     gradients_of_generator2 = gen2_tape.gradient(gen2_loss, generator2.trainable_variables)
@@ -334,7 +333,8 @@ def train(
 
     gnn = BaseGNNModel(input_dim=6, hidden_dim=256, output_dim=5, num_layers=12)
     # Load the state dictionary of the saved model
-    gnn.load_state_dict(torch.load(r'C:\Users\flopes1\OneDrive - Saint Louis University\Desktop\Repos\temporal-multispectral-gen-models\gnn\trained_backcasting_gnn_model.pth'))
+    # gnn.load_state_dict(torch.load(r'C:\Users\flopes1\OneDrive - Saint Louis University\Desktop\Repos\temporal-multispectral-gen-models\gnn\trained_backcasting_gnn_model.pth'))
+    gnn.load_state_dict(torch.load(r'/Users/felipealencar/Desktop/temporal-multispectral-gen-models/gnn/trained_backcasting_gnn_model.pth'))
     # Set the model in evaluation mode
     gnn.eval()
     
